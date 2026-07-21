@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>쇼핑리스트</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
+      background: #f4f5f7;
+      display: flex;
+      justify-content: center;
+      padding: 40px 16px;
+      min-height: 100vh;
+      color: #1a1a2e;
+    }
+    .app {
+      background: #fff;
+      width: 100%;
+      max-width: 440px;
+      border-radius: 16px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+      padding: 28px;
+    }
+    h1 {
+      font-size: 24px;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .subtitle {
+      color: #8a8a9e;
+      font-size: 13px;
+      margin-bottom: 20px;
+    }
+    .input-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    #itemInput {
+      flex: 1;
+      padding: 12px 14px;
+      border: 1px solid #e0e0e8;
+      border-radius: 10px;
+      font-size: 15px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    #itemInput:focus { border-color: #6c5ce7; }
+    #addBtn {
+      background: #6c5ce7;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 0 20px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    #addBtn:hover { background: #5a4bd1; }
+    ul { list-style: none; }
+    li {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 8px;
+      border-bottom: 1px solid #f0f0f5;
+      animation: fadeIn .2s;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; } }
+    li .check {
+      width: 22px;
+      height: 22px;
+      border: 2px solid #cfcfe0;
+      border-radius: 6px;
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all .15s;
+    }
+    li.done .check {
+      background: #6c5ce7;
+      border-color: #6c5ce7;
+    }
+    li.done .check::after {
+      content: "✓";
+      color: #fff;
+      font-size: 14px;
+    }
+    li .text {
+      flex: 1;
+      font-size: 15px;
+      word-break: break-all;
+    }
+    li.done .text {
+      text-decoration: line-through;
+      color: #b0b0c0;
+    }
+    li .del {
+      background: none;
+      border: none;
+      color: #cfcfe0;
+      font-size: 20px;
+      cursor: pointer;
+      padding: 0 4px;
+      line-height: 1;
+      transition: color .15s;
+    }
+    li .del:hover { color: #e74c3c; }
+    .empty {
+      text-align: center;
+      color: #b0b0c0;
+      padding: 30px 0;
+      font-size: 14px;
+    }
+    .footer {
+      margin-top: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      color: #8a8a9e;
+    }
+    #clearDone {
+      background: none;
+      border: none;
+      color: #8a8a9e;
+      cursor: pointer;
+      font-size: 13px;
+      text-decoration: underline;
+    }
+    #clearDone:hover { color: #e74c3c; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>🛒 쇼핑리스트</h1>
+    <p class="subtitle">필요한 물건을 추가하고 장 볼 때 체크하세요</p>
+
+    <div class="input-row">
+      <input type="text" id="itemInput" placeholder="예: 우유, 계란, 사과..." maxlength="60" autocomplete="off">
+      <button id="addBtn">추가</button>
+    </div>
+
+    <ul id="list"></ul>
+
+    <div class="footer">
+      <span id="count">0개 항목</span>
+      <button id="clearDone">완료 항목 지우기</button>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = "shopping-list-items";
+    let items = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+
+    const listEl = document.getElementById("list");
+    const inputEl = document.getElementById("itemInput");
+    const addBtn = document.getElementById("addBtn");
+    const countEl = document.getElementById("count");
+    const clearDoneBtn = document.getElementById("clearDone");
+
+    function save() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    }
+
+    function render() {
+      listEl.innerHTML = "";
+
+      if (items.length === 0) {
+        listEl.innerHTML = '<li class="empty">아직 항목이 없습니다. 위에서 추가해 보세요!</li>';
+      } else {
+        items.forEach((item, index) => {
+          const li = document.createElement("li");
+          if (item.done) li.classList.add("done");
+
+          const check = document.createElement("div");
+          check.className = "check";
+          check.title = "체크";
+          check.addEventListener("click", () => toggle(index));
+
+          const text = document.createElement("span");
+          text.className = "text";
+          text.textContent = item.name;
+
+          const del = document.createElement("button");
+          del.className = "del";
+          del.textContent = "×";
+          del.title = "삭제";
+          del.addEventListener("click", () => remove(index));
+
+          li.append(check, text, del);
+          listEl.appendChild(li);
+        });
+      }
+
+      const remaining = items.filter(i => !i.done).length;
+      countEl.textContent = `${items.length}개 항목 · 남은 것 ${remaining}개`;
+    }
+
+    function add() {
+      const name = inputEl.value.trim();
+      if (!name) return;
+      items.push({ name, done: false });
+      inputEl.value = "";
+      save();
+      render();
+      inputEl.focus();
+    }
+
+    function toggle(index) {
+      items[index].done = !items[index].done;
+      save();
+      render();
+    }
+
+    function remove(index) {
+      items.splice(index, 1);
+      save();
+      render();
+    }
+
+    function clearDone() {
+      items = items.filter(i => !i.done);
+      save();
+      render();
+    }
+
+    addBtn.addEventListener("click", add);
+    inputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") add();
+    });
+    clearDoneBtn.addEventListener("click", clearDone);
+
+    render();
+  </script>
+</body>
+</html>

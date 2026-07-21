@@ -1,0 +1,14 @@
+{
+  "name": "shopping-list-app",
+  "version": "1.0.0",
+  "description": "바닐라 JS로 만든 쇼핑리스트 앱 (localStorage 기반)",
+  "type": "module",
+  "scripts": {
+    "test": "node test-shopping-list.mjs"
+  },
+  "keywords": ["shopping-list", "vanilla-js", "localstorage", "playwright"],
+  "license": "MIT",
+  "devDependencies": {
+    "playwright": "^1.61.1"
+  }
+}
