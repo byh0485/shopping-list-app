@@ -156,9 +156,19 @@
     </div>
   </div>
 
-  <script>
-    const STORAGE_KEY = "shopping-list-items";
-    let items = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+  <script type="module">
+    import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+    // Supabase 연결 정보.
+    // publishable 키는 브라우저에 노출되도록 설계된 공개 클라이언트 키이며,
+    // 실제 데이터 접근은 서버 측 RLS(Row Level Security) 정책이 통제한다.
+    const SUPABASE_URL = "https://efplhfpkksjnzmlghvby.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_BHZgfaj7TuDWPh2Qb40eeg_nWm3D4GI";
+    const TABLE = "shopping_items";
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let items = [];
 
     const listEl = document.getElementById("list");
     const inputEl = document.getElementById("itemInput");
@@ -166,8 +176,17 @@
     const countEl = document.getElementById("count");
     const clearDoneBtn = document.getElementById("clearDone");
 
-    function save() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    async function load() {
+      const { data, error } = await supabase
+        .from(TABLE)
+        .select("id, name, done")
+        .order("created_at", { ascending: true });
+      if (error) {
+        console.error("항목을 불러오지 못했습니다:", error.message);
+        return;
+      }
+      items = data;
+      render();
     }
 
     function render() {
@@ -176,14 +195,14 @@
       if (items.length === 0) {
         listEl.innerHTML = '<li class="empty">아직 항목이 없습니다. 위에서 추가해 보세요!</li>';
       } else {
-        items.forEach((item, index) => {
+        items.forEach((item) => {
           const li = document.createElement("li");
           if (item.done) li.classList.add("done");
 
           const check = document.createElement("div");
           check.className = "check";
           check.title = "체크";
-          check.addEventListener("click", () => toggle(index));
+          check.addEventListener("click", () => toggle(item.id));
 
           const text = document.createElement("span");
           text.className = "text";
@@ -193,7 +212,7 @@
           del.className = "del";
           del.textContent = "×";
           del.title = "삭제";
-          del.addEventListener("click", () => remove(index));
+          del.addEventListener("click", () => remove(item.id));
 
           li.append(check, text, del);
           listEl.appendChild(li);
@@ -204,31 +223,65 @@
       countEl.textContent = `${items.length}개 항목 · 남은 것 ${remaining}개`;
     }
 
-    function add() {
+    async function add() {
       const name = inputEl.value.trim();
       if (!name) return;
-      items.push({ name, done: false });
       inputEl.value = "";
-      save();
-      render();
       inputEl.focus();
-    }
 
-    function toggle(index) {
-      items[index].done = !items[index].done;
-      save();
+      const { data, error } = await supabase
+        .from(TABLE)
+        .insert({ name, done: false })
+        .select("id, name, done")
+        .single();
+      if (error) {
+        console.error("항목을 추가하지 못했습니다:", error.message);
+        return;
+      }
+      items.push(data);
       render();
     }
 
-    function remove(index) {
-      items.splice(index, 1);
-      save();
+    async function toggle(id) {
+      const item = items.find(i => i.id === id);
+      if (!item) return;
+      const newDone = !item.done;
+
+      const { error } = await supabase
+        .from(TABLE)
+        .update({ done: newDone })
+        .eq("id", id);
+      if (error) {
+        console.error("항목을 수정하지 못했습니다:", error.message);
+        return;
+      }
+      item.done = newDone;
       render();
     }
 
-    function clearDone() {
+    async function remove(id) {
+      const { error } = await supabase
+        .from(TABLE)
+        .delete()
+        .eq("id", id);
+      if (error) {
+        console.error("항목을 삭제하지 못했습니다:", error.message);
+        return;
+      }
+      items = items.filter(i => i.id !== id);
+      render();
+    }
+
+    async function clearDone() {
+      const { error } = await supabase
+        .from(TABLE)
+        .delete()
+        .eq("done", true);
+      if (error) {
+        console.error("완료 항목을 지우지 못했습니다:", error.message);
+        return;
+      }
       items = items.filter(i => !i.done);
-      save();
       render();
     }
 
@@ -238,7 +291,7 @@
     });
     clearDoneBtn.addEventListener("click", clearDone);
 
-    render();
+    load();
   </script>
 </body>
 </html>
