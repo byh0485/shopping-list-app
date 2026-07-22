@@ -136,23 +136,111 @@
       text-decoration: underline;
     }
     #clearDone:hover { color: #e74c3c; }
+
+    /* ---- 인증(로그인/회원가입) ---- */
+    .hidden { display: none !important; }
+    .auth-form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .auth-form input {
+      padding: 12px 14px;
+      border: 1px solid #e0e0e8;
+      border-radius: 10px;
+      font-size: 15px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .auth-form input:focus { border-color: #6c5ce7; }
+    .auth-buttons { display: flex; gap: 8px; }
+    .auth-buttons button {
+      flex: 1;
+      border-radius: 10px;
+      padding: 12px 0;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+    #loginBtn {
+      background: #6c5ce7;
+      color: #fff;
+      border: none;
+    }
+    #loginBtn:hover { background: #5a4bd1; }
+    #signupBtn {
+      background: #fff;
+      color: #6c5ce7;
+      border: 1px solid #6c5ce7;
+    }
+    #signupBtn:hover { background: #f2f0ff; }
+    .auth-msg {
+      font-size: 13px;
+      min-height: 18px;
+      color: #8a8a9e;
+    }
+    .auth-msg.error { color: #e74c3c; }
+    .auth-msg.ok { color: #2ecc71; }
+    .user-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+      font-size: 13px;
+      color: #8a8a9e;
+    }
+    #userEmail { font-weight: 600; color: #6c5ce7; word-break: break-all; }
+    #logoutBtn {
+      background: none;
+      border: none;
+      color: #8a8a9e;
+      cursor: pointer;
+      font-size: 13px;
+      text-decoration: underline;
+      flex-shrink: 0;
+      margin-left: 12px;
+    }
+    #logoutBtn:hover { color: #e74c3c; }
   </style>
 </head>
 <body>
   <div class="app">
     <h1>🛒 쇼핑리스트</h1>
-    <p class="subtitle">필요한 물건을 추가하고 장 볼 때 체크하세요</p>
 
-    <div class="input-row">
-      <input type="text" id="itemInput" placeholder="예: 우유, 계란, 사과..." maxlength="60" autocomplete="off">
-      <button id="addBtn">추가</button>
+    <!-- 로그인/회원가입 화면 -->
+    <div id="authView">
+      <p class="subtitle">로그인하면 내 쇼핑리스트가 저장돼요</p>
+      <div class="auth-form">
+        <input type="email" id="emailInput" placeholder="이메일" autocomplete="username">
+        <input type="password" id="passwordInput" placeholder="비밀번호 (6자 이상)" autocomplete="current-password">
+        <div class="auth-buttons">
+          <button id="loginBtn">로그인</button>
+          <button id="signupBtn">회원가입</button>
+        </div>
+        <p class="auth-msg" id="authMsg"></p>
+      </div>
     </div>
 
-    <ul id="list"></ul>
+    <!-- 쇼핑리스트 화면 (로그인 후 표시) -->
+    <div id="appView" class="hidden">
+      <div class="user-bar">
+        <span><span id="userEmail"></span> 님</span>
+        <button id="logoutBtn">로그아웃</button>
+      </div>
 
-    <div class="footer">
-      <span id="count">0개 항목</span>
-      <button id="clearDone">완료 항목 지우기</button>
+      <div class="input-row">
+        <input type="text" id="itemInput" placeholder="예: 우유, 계란, 사과..." maxlength="60" autocomplete="off">
+        <button id="addBtn">추가</button>
+      </div>
+
+      <ul id="list"></ul>
+
+      <div class="footer">
+        <span id="count">0개 항목</span>
+        <button id="clearDone">완료 항목 지우기</button>
+      </div>
     </div>
   </div>
 
@@ -175,6 +263,17 @@
     const addBtn = document.getElementById("addBtn");
     const countEl = document.getElementById("count");
     const clearDoneBtn = document.getElementById("clearDone");
+
+    // 인증 관련 요소
+    const authView = document.getElementById("authView");
+    const appView = document.getElementById("appView");
+    const emailInput = document.getElementById("emailInput");
+    const passwordInput = document.getElementById("passwordInput");
+    const loginBtn = document.getElementById("loginBtn");
+    const signupBtn = document.getElementById("signupBtn");
+    const authMsg = document.getElementById("authMsg");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const userEmailEl = document.getElementById("userEmail");
 
     async function load() {
       const { data, error } = await supabase
@@ -285,13 +384,111 @@
       render();
     }
 
+    // ---------- 인증 ----------
+    function setAuthMsg(text, kind = "") {
+      authMsg.textContent = text;
+      authMsg.className = "auth-msg" + (kind ? " " + kind : "");
+    }
+
+    function setBusy(busy) {
+      loginBtn.disabled = busy;
+      signupBtn.disabled = busy;
+    }
+
+    async function login() {
+      const email = emailInput.value.trim();
+      const password = passwordInput.value;
+      if (!email || !password) {
+        setAuthMsg("이메일과 비밀번호를 입력하세요.", "error");
+        return;
+      }
+      setBusy(true);
+      setAuthMsg("로그인 중...");
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      setBusy(false);
+      if (error) {
+        setAuthMsg("로그인 실패: " + error.message, "error");
+        return;
+      }
+      setAuthMsg("");
+      // 세션 반영은 onAuthStateChange가 처리한다.
+    }
+
+    async function signup() {
+      const email = emailInput.value.trim();
+      const password = passwordInput.value;
+      if (!email || !password) {
+        setAuthMsg("이메일과 비밀번호를 입력하세요.", "error");
+        return;
+      }
+      setBusy(true);
+      setAuthMsg("가입 중...");
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      setBusy(false);
+      if (error) {
+        setAuthMsg("회원가입 실패: " + error.message, "error");
+        return;
+      }
+      // 이메일 확인이 켜져 있으면 세션 없이 사용자만 생성된다.
+      if (!data.session) {
+        setAuthMsg("확인 메일을 보냈습니다. 메일의 링크를 눌러 인증한 뒤 로그인하세요.", "ok");
+        return;
+      }
+      setAuthMsg("");
+      // 세션이 바로 발급된 경우 onAuthStateChange가 화면을 전환한다.
+    }
+
+    async function logout() {
+      await supabase.auth.signOut();
+      // 화면 전환은 onAuthStateChange가 처리한다.
+    }
+
+    // 로그인/로그아웃 상태에 따라 화면을 전환한다.
+    // getSession()과 onAuthStateChange(INITIAL_SESSION)가 모두 호출될 수 있으므로,
+    // 같은 사용자에 대한 중복 처리는 건너뛴다.
+    let currentUserId = null;
+    async function applySession(session) {
+      const nextUserId = session?.user?.id ?? null;
+      if (nextUserId === currentUserId) return;
+      currentUserId = nextUserId;
+
+      if (session) {
+        userEmailEl.textContent = session.user.email;
+        authView.classList.add("hidden");
+        appView.classList.remove("hidden");
+        emailInput.value = "";
+        passwordInput.value = "";
+        await load();
+      } else {
+        appView.classList.add("hidden");
+        authView.classList.remove("hidden");
+        items = [];
+        listEl.innerHTML = "";
+      }
+    }
+
+    // ---------- 이벤트 바인딩 ----------
     addBtn.addEventListener("click", add);
     inputEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter") add();
     });
     clearDoneBtn.addEventListener("click", clearDone);
 
-    load();
+    loginBtn.addEventListener("click", login);
+    signupBtn.addEventListener("click", signup);
+    logoutBtn.addEventListener("click", logout);
+    passwordInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") login();
+    });
+
+    // 로그인 상태 변화(로그인/로그아웃/토큰갱신)를 구독한다.
+    supabase.auth.onAuthStateChange((_event, session) => {
+      applySession(session);
+    });
+
+    // 초기 세션 확인 (새로고침 후에도 로그인 유지)
+    const { data: { session } } = await supabase.auth.getSession();
+    await applySession(session);
   </script>
 </body>
 </html>
